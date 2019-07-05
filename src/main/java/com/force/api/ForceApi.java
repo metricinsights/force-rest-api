@@ -1,10 +1,5 @@
 package com.force.api;
 
-import com.force.api.http.Http;
-import com.force.api.http.HttpRequest;
-import com.force.api.http.HttpResponse;
-
-import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonGenerationException;
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.JsonMappingException;
@@ -12,19 +7,20 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.force.api.http.Http;
+import com.force.api.http.HttpRequest;
+import com.force.api.http.HttpResponse;
+import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
+import java.nio.charset.Charset;
 import java.text.SimpleDateFormat;
-import java.util.Date;
+import java.util.*;
+import java.util.Map.Entry;
 
 /**
  * main class for making API calls.
@@ -451,6 +447,21 @@ public class ForceApi {
 			throw new ResourceException(e);
 		} catch (IOException e) {
 			throw new ResourceException(e);
+		}
+	}
+
+	public String exportReportCSV(String reportId, String sid){
+		try {
+			String requestUrl = String.format("%s/%s?csv=1&exp=1&isdtp=p1", session.getApiEndpoint(), reportId);
+			HttpResponse response = apiRequest(new HttpRequest()
+                    .url(requestUrl)
+                    .method("GET")
+                    .header("Accept", "text/csv")
+                    .header("Cookie", String.format("sid=%s", sid))
+            );
+			return IOUtils.toString(response.getStream(), Charset.defaultCharset());
+        } catch (IOException e) {
+            throw new ResourceException(e);
 		}
 	}
 
