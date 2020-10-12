@@ -3,7 +3,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.frejo</groupId>
     <artifactId>force-rest-api</artifactId>
-    <version>0.42.0-mi</version>
+    <version>0.43.0-mi</version>
     <name>force-rest-api</name>
     <url>https://github.com/jesperfj/force-rest-api</url>
     <description>

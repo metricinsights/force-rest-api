@@ -452,14 +452,16 @@ public class ForceApi {
 
 	public String exportReportCSV(String reportId, String sid){
 		try {
-			String requestUrl = String.format("%s/%s?csv=1&exp=1&isdtp=p1", session.getApiEndpoint(), reportId);
+			String encoding = Charset.defaultCharset().displayName();
+			String requestUrl = String.format("%s/%s?csv=1&exp=1&isdtp=p1&enc=%s",
+					session.getApiEndpoint(), reportId, encoding);
 			HttpResponse response = apiRequest(new HttpRequest()
                     .url(requestUrl)
                     .method("GET")
                     .header("Accept", "text/csv")
                     .header("Cookie", String.format("sid=%s", sid))
             );
-			return IOUtils.toString(response.getStream(), Charset.defaultCharset());
+			return IOUtils.toString(response.getStream(), encoding);
         } catch (IOException e) {
             throw new ResourceException(e);
 		}
