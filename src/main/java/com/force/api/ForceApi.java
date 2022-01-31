@@ -472,7 +472,8 @@ public class ForceApi {
 
     public String exportReportExcel(String reportId, String token) {
         try {
-            String url = String.format("%s/services/data/v53.0/analytics/reports/%s", session.getApiEndpoint(), reportId);
+            String url = String.format("%s/analytics/reports/%s", uriBase(), reportId);
+            logger.info("Request url to get excel: {}",url);
 
             String encoding = Charset.defaultCharset().displayName();
             HttpResponse response = apiRequest(new HttpRequest()
