@@ -15,6 +15,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.servlet.DefaultServlet;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
 import org.junit.Test;
@@ -149,13 +150,16 @@ public class EndToEndOAuthFlowExample {
         ServletContextHandler context = new ServletContextHandler(ServletContextHandler.SESSIONS);
         context.setContextPath("/");
         server.setHandler(context);
-        context.addServlet(new ServletHolder(new HttpServlet() {
-            protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+
+        DefaultServlet servlet = new DefaultServlet() {
+            protected void doGet(HttpServletRequest req, HttpServletResponse resp) {
                 System.out.println("Jetty received OAuth callback");
                 setOauthResponse(req.getParameter("code"), req.getParameter("state"));
             }
 
-        }), path);
+        };
+
+        context.addServlet(new ServletHolder(servlet), path);
         try {
             server.start();
         } catch (Exception e) {
