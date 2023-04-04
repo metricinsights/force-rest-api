@@ -46,9 +46,10 @@ public class ForceApi {
 
     private static final String SF_DATE_FORMAT = "EEE, dd MMM yyyy HH:mm:ss z";
 
-    final ApiConfig config;
-    ApiSession session;
-    private boolean autoRenew = false;
+	final ApiConfig config;
+	ApiSession session;
+	private boolean autoRenew = false;
+	boolean useRootPath = false;
 
     public ForceApi(ApiConfig config, ApiSession session) {
         this.config = config;
@@ -75,34 +76,46 @@ public class ForceApi {
         return session;
     }
 
-    public String curlHelper() {
-        return "curl -s -H 'Authorization: Bearer " + session.getAccessToken() + "' " + uriBase() + " | jq .";
-    }
+	public ForceApi rootPath() {
+		ForceApi clone = new ForceApi(this.config, this.session);
+        clone.useRootPath=true;
+		return clone;
+	}
 
-    public ResourceRepresentation get(String path) {
-        return new ResourceRepresentation(apiRequest(new HttpRequest()
-                .url(uriBase() + path)
-                .method("GET")
-                .header("Accept", "application/json")),
-                jsonMapper);
-    }
+	public String curlHelper() {
+		return "curl -s -H 'Authorization: Bearer "+session.getAccessToken()+"' "+uriBase()+" | jq .";
+	}
 
-    /**
-     * sends a custom REST API DELETE request
-     *
-     * @param path service path to be called - i.e. /process/approvals/
-     * @return response from API wrapped in a ResourceRepresentation for multiple deserialization options. DELETE
-     * responses are generally empty, so you may get an error if you try to deserialize into a class by calling
-     * `as(...)` on ResourceRepresentation. The DELETE can be assumed to have succeeded if this method does not
-     * throw an exception.
-     */
-    public ResourceRepresentation delete(String path) {
-        return new ResourceRepresentation(apiRequest(new HttpRequest()
-                .url(uriBase() + path)
-                .method("DELETE")
-                .header("Accept", "application/json")),
-                jsonMapper);
-    }
+	/**
+	 * sends a custom REST API GET request
+	 *
+	 * @param path     service path to be called - i.e. /process/approvals/
+	 * @return response from API wrapped in a ResourceRepresentation for multiple deserialization options.
+	 */
+	public ResourceRepresentation get(String path) {
+		return new ResourceRepresentation(apiRequest(new HttpRequest()
+				.url(uriBaseOrRoot()+path)
+				.method("GET")
+				.header("Accept", "application/json")),
+				jsonMapper);
+	}
+
+	/**
+	 * sends a custom REST API DELETE request
+	 *
+	 * @param path     service path to be called - i.e. /process/approvals/
+	 * @return response from API wrapped in a ResourceRepresentation for multiple deserialization options. DELETE
+	 * responses are generally empty, so you may get an error if you try to deserialize into a class by calling
+	 * `as(...)` on ResourceRepresentation. The DELETE can be assumed to have succeeded if this method does not
+	 * throw an exception.
+	 */
+	public ResourceRepresentation delete(String path) {
+		return new ResourceRepresentation(apiRequest(new HttpRequest()
+				.url(uriBaseOrRoot() + path)
+				.method("DELETE")
+				.header("Accept", "application/json")),
+				jsonMapper);
+	}
 
     /**
      * sends a custom REST API POST request
@@ -138,23 +151,23 @@ public class ForceApi {
         return request("POST", path + sep + "_HttpMethod=PATCH", input);
     }
 
-    public ResourceRepresentation request(String method, String path, Object input) {
-        try {
-            return new ResourceRepresentation(apiRequest(new HttpRequest()
-                    .url(uriBase() + path)
-                    .method(method)
-                    .header("Accept", "application/json")
-                    .header("Content-Type", "application/json")
-                    .content(jsonMapper.writeValueAsBytes(input))),
-                    jsonMapper);
-        } catch (JsonGenerationException e) {
-            throw new ResourceException(e);
-        } catch (JsonMappingException e) {
-            throw new ResourceException(e);
-        } catch (IOException e) {
-            throw new ResourceException(e);
-        }
-    }
+	public ResourceRepresentation request(String method, String path, Object input) {
+		try {
+			return new ResourceRepresentation(apiRequest(new HttpRequest()
+					.url(uriBaseOrRoot() + path)
+					.method(method)
+					.header("Accept", "application/json")
+					.header("Content-Type", "application/json")
+					.content(jsonMapper.writeValueAsBytes(input))),
+					jsonMapper);
+		} catch (JsonGenerationException e) {
+			throw new ResourceException(e);
+		} catch (JsonMappingException e) {
+			throw new ResourceException(e);
+		} catch (IOException e) {
+			throw new ResourceException(e);
+		}
+	}
 
     public Identity getIdentity() {
         try {
@@ -250,26 +263,40 @@ public class ForceApi {
         );
     }
 
-    public CreateOrUpdateResult createOrUpdateSObject(String type, String externalIdField, String externalIdValue, Object sObject) {
-        try {
-            // See createSObject for note on streaming ambition
-            HttpResponse res =
-                    apiRequest(new HttpRequest()
-                            .url(uriBase() + "/sobjects/" + type + "/" + externalIdField + "/" + URLEncoder.encode(externalIdValue, "UTF-8") + "?_HttpMethod=PATCH")
-                            .method("POST")
-                            .header("Accept", "application/json")
-                            .header("Content-Type", "application/json")
-                            .content(jsonMapper.writeValueAsBytes(sObject))
-                    );
-            if (res.getResponseCode() == 201) {
-                return CreateOrUpdateResult.CREATED;
-            } else if (res.getResponseCode() == 204) {
-                return CreateOrUpdateResult.UPDATED;
-            } else {
-                logger.debug("Code: {}", res.getResponseCode());
-                logger.debug("Message: {}", res.getString());
-                throw new RuntimeException();
-            }
+	public CreateOrUpdateResult createOrUpdateSObject(String type, String externalIdField, String externalIdValue, Object sObject) {
+		try {
+			// See createSObject for note on streaming ambition
+			HttpResponse res =
+				apiRequest(new HttpRequest()
+					.url(uriBase()+"/sobjects/"+type+"/"+externalIdField+"/"+URLEncoder.encode(externalIdValue,"UTF-8")+"?_HttpMethod=PATCH")
+					.method("POST")
+					.header("Accept", "application/json")
+					.header("Content-Type", "application/json")
+					.content(jsonMapper.writeValueAsBytes(sObject))
+				);
+			if((new ExtendedApiVersion(config.getApiVersionString())).getVersion() >= 46) {
+				// As of v46, Salesforce changed behavior:
+				// https://developer.salesforce.com/docs/atlas.en-us.api_rest.meta/api_rest/dome_upsert.htm
+				// v46+ always returns 200 along with a json response that indicated whether a record was
+				// created or updated
+				Map<String,Object> respData = jsonMapper.readValue(res.getStream(),Map.class);
+				if(respData.get("created").toString().equals("true")) {
+					return CreateOrUpdateResult.CREATED;
+				} else {
+					return CreateOrUpdateResult.UPDATED;
+				}
+			} else {
+				// v45 and older behavior
+				if(res.getResponseCode()==201) {
+					return CreateOrUpdateResult.CREATED;
+				} else if(res.getResponseCode()==204) {
+					return CreateOrUpdateResult.UPDATED;
+				} else {
+					logger.debug("Code: {}",res.getResponseCode());
+					logger.debug("Message: {}",res.getString());
+					throw new RuntimeException();
+				}
+			}
 
         } catch (JsonGenerationException e) {
             throw new ResourceException(e);
@@ -470,6 +497,17 @@ public class ForceApi {
         }
     }
 
+	private final String uriBase() {
+		return(session.getApiEndpoint()+"/services/data/"+config.getApiVersionString());
+	}
+
+	private final String uriBaseOrRoot() {
+		if(useRootPath) {
+			return(session.getApiEndpoint());
+		} else {
+			return(session.getApiEndpoint()+"/services/data/"+config.getApiVersionString());
+		}
+	}
     public String exportReportExcel(String reportId, String token) {
         try {
             String url = String.format("%s/analytics/reports/%s", uriBase(), reportId);
@@ -488,10 +526,6 @@ public class ForceApi {
         } catch (IOException e) {
             throw new ResourceException(e);
         }
-    }
-
-    private final String uriBase() {
-        return (session.getApiEndpoint() + "/services/data/" + config.getApiVersionString());
     }
 
     private final HttpResponse apiRequest(HttpRequest req) {

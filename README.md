@@ -1,6 +1,6 @@
-# Force.com REST API Connector
+# Salesforce REST API Connector
 
-Lightweight library for building Force.com apps with OAuth authentication and data access through the Force.com REST API.
+Lightweight library for building Salesforce apps with OAuth authentication and data access through the Salesforce REST API.
 
 # Usage
 
@@ -9,7 +9,7 @@ Releases are published on Maven Central. Include in your project with:
     <dependency>
         <groupId>com.frejo</groupId>
         <artifactId>force-rest-api</artifactId>
-        <version>0.0.41</version>
+        <version>0.0.45</version>
     </dependency>
 
 ## Build and link locally
@@ -36,7 +36,7 @@ To check out the source code for a particular version found in Maven Central, us
 
 ### API versions
 
-Force.com API updates its API version with every Salesforce release (3 times per year). The new version is supposed to always be backwards compatible, so in theory it is safe to always use the latest API version. However `force-rest-api` is designed to be conservative. The API version used may change with new versions of the library, but for a given version of the library, the version will always be `ApiVersion.DEFAULT_VERSION` unless you explicitly set it to something different. You set the API version when you instantiate an `ApiConfig`:
+Salesforce updates its API version with every Salesforce release (3 times per year). The new version is supposed to always be backwards compatible, so in theory it is safe to always use the latest API version. However `force-rest-api` is designed to be conservative. The API version used may change with new versions of the library, but for a given version of the library, the version will always be `ApiVersion.DEFAULT_VERSION` unless you explicitly set it to something different. You set the API version when you instantiate an `ApiConfig`:
 
     ApiConfig mycfg = new ApiConfig().setApiVersionString("v99.0");
 
@@ -162,6 +162,15 @@ This assumes you have an Account class defined with proper Jackson deserializati
 
     QueryResult<Account> res = api.query("SELECT id FROM Account WHERE name LIKE 'Test account%'", Account.class);
 
+### CRUD operations on root path
+
+Sometimes you want to do CRUD operations without the standard `/services/data/<version>` path prefix. To do this you can get a ForceApi instance that uses root path:
+
+    ForceApi api = new ForceApi(myConfig,mySession);
+    api.rootPath().get("/services/apexrest/myApexClass");
+
+`rootPath()` returns a new ForceApi instance that uses root path for the `get()`, `delete()`, `put()`, `post()`, `patch()` and `request()` methods.
+
 ## Working with API versions
 
 You can inspect supported API versions and get more detailed info for each version using `SupportedVersions`:
@@ -181,7 +190,9 @@ There is a direct mapping between season/year and version numbers. You can trans
 
 ## Run Tests
 
-This project has a mix of unit tests and integration tests that hit the actual API. To make the integration tests work you must set up a proper test fixture and reference it from environment variables. `.testenv.sample` contains a sample shell script indicating what variables must be set.
+This project has a mix of unit tests and integration tests that hit the actual API. To make the integration tests work you must set up a proper test fixture and reference it from environment variables. `.testenv.sample` contains a sample shell script indicating what variables must be set. Copy it to `.testenv` and once you have all the correct values, set it in the environment by running the shell command:
+
+    source .testenv
 
 ### Login and password
 
@@ -220,11 +231,18 @@ To test IP restrictions failure handling you need additional test setup:
 
 ### Run Tests
 
+Before running the whole test suite, it is a good idea to run a single login test to check if the configuration is correct. If the username/password is not configured correctly, the test suite will trigger an account lock-out due to the many failed attempts. Run a single test such as `testSoapLogin` with:
+
+    mvn -Dtest=com.force.api.AuthTest#testSoapLogin test
+
+
 Now run tests with
 
     $ mvn test
 
-You will see some log messages that look like errors or warnings. That's expected and does not indicate test failures.
+You will see some log messages that look like errors or warnings. That's expected and does not indicate test failures. You can add debug logging with:
+
+    $ mvn test -Dorg.slf4j.simpleLogger.defaultLogLevel=debug
 
 ### Interactive end-to-end OAuth handshake Test
 
@@ -242,6 +260,10 @@ First ensure all your code is checked in (with `git status` or the like). Then r
 
     $ mvn test javadoc:javadoc
 
+Note. You must have `JAVA_HOME` set for this to succeed. On Mac, set it with
+
+    $ export JAVA_HOME=$(/usr/libexec/java_home)
+
 Now find the latest version number with `git tag` (or in Maven central depending on what you trust most). Bump the version number to that plus one:
 
     $ mvn versions:set -DnewVersion=<new-version>
@@ -258,6 +280,10 @@ This tags the local and remote repository with the full module name, e.g. force-
 
     $ mvn clean deploy -DperformRelease
 
+That command will fail if you don't have gpg installed. Install on MacOS with
+
+    $ brew install gpg
+
 When you're done, reset the local version change to pom.xml with:
 
     $ mvn versions:revert
@@ -270,9 +296,35 @@ There should be nothing to push. If something is messed up, delete the tags in G
 
 # Release History
 
+## 0.0.45
+
+* No major changes
+* Default API version bumped to v55.
+* Update Jetty version used for OAuth test (only a test change)
+
+## 0.0.44
+
+* Default API version bumped to v51. Added v50 and v51 to supported versions.
+* Add ability to access root path with API calls `get put patch post delete request` using `ForceApi.rootPath()` (briefly explained in README). Thanks @ModeratelyComfortableChair for suggestion.
+* login and password strings are now XML escaped when doing `soaploginPasswordFlow`. The characters `< > & ' "` are replaced with their &...; XML escape codes. Thanks @fredboutin for suggestion.
+* JUnit test dependency bumped from 4.10 to 4.13.1
+* Added test dependencies for jetty-util and jetty-http because apparently they are now needed.
+
+## 0.0.43
+
+* The full request is no longer logged on a bad request to prevent sensitive data from ending up in logs. Contributed by [faf0-addepar](https://github/faf0-addepar)
+* Default API version bumped to v49 (Summer 2020). Code added to handle v46+ new behavior on upsert. 2021-03-19 NOTE: There was a bug here. Default version in 0.0.43 was actually v45.
+
+## 0.0.42
+
+* Add JsonAlias to support Platform Events. Contributed by [rgoers](https://github.com/rgoers).
+* Note that default API version for this release is old: v45. Tests are failing on v46 and up due to some undocumented changes in response codes.
+
 ## 0.0.41
 
 * Introduces [ForceApi.describeSObjectIfModified](https://github.com/jesperfj/force-rest-api/blob/75f718a2385d8daa42cee93c2b13d88b8dd4c5d9/src/main/java/com/force/api/ForceApi.java#L431) to make it more efficient to poll Salesforce for metadata changes to an SObject.
+* Change jackson-databind version range to [2.9.10.3,) to address security alert
+* This release is happening a long time after 0.0.40. It is possible a few other things might have changed.
 
 ## 0.0.40
 

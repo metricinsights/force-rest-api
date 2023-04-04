@@ -15,18 +15,10 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.servlet.DefaultServlet;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
 import org.junit.Test;
-
-import com.gargoylesoftware.htmlunit.FailingHttpStatusCodeException;
-import com.gargoylesoftware.htmlunit.Page;
-import com.gargoylesoftware.htmlunit.WebClient;
-import com.gargoylesoftware.htmlunit.html.HtmlForm;
-import com.gargoylesoftware.htmlunit.html.HtmlPage;
-import com.gargoylesoftware.htmlunit.html.HtmlPasswordInput;
-import com.gargoylesoftware.htmlunit.html.HtmlButton;
-import com.gargoylesoftware.htmlunit.html.HtmlTextInput;
 
 public class EndToEndOAuthFlowExample {
 
@@ -35,7 +27,7 @@ public class EndToEndOAuthFlowExample {
     String state;
 
     @Test
-    public void endToEndOAuthFlowTest() throws FailingHttpStatusCodeException, MalformedURLException, IOException {
+    public void endToEndOAuthFlowTest() throws MalformedURLException, IOException {
 
         // This test goes through the complete oauth flow.
         // It uses HtmlUnit as web client and Jetty as embedded server.
@@ -158,13 +150,16 @@ public class EndToEndOAuthFlowExample {
         ServletContextHandler context = new ServletContextHandler(ServletContextHandler.SESSIONS);
         context.setContextPath("/");
         server.setHandler(context);
-        context.addServlet(new ServletHolder(new HttpServlet() {
-            protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+
+        DefaultServlet servlet = new DefaultServlet() {
+            protected void doGet(HttpServletRequest req, HttpServletResponse resp) {
                 System.out.println("Jetty received OAuth callback");
                 setOauthResponse(req.getParameter("code"), req.getParameter("state"));
             }
 
-        }), path);
+        };
+
+        context.addServlet(new ServletHolder(servlet), path);
         try {
             server.start();
         } catch (Exception e) {
